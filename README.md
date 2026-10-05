@@ -10,9 +10,37 @@ Octavia load balancer behind the Kubernetes API, and a server group that
 spreads the control plane. Machines receive everything they need through
 the `exports` output.
 
-Design and evidence: [DESIGN.md](DESIGN.md). Rules every file follows:
-[CONVENTIONS.md](CONVENTIONS.md). Contract:
+Design and evidence: [DESIGN.md](https://github.com/captf-io/terraform-openstack-cluster/blob/main/DESIGN.md). Rules every file follows:
+[CONVENTIONS.md](https://github.com/captf-io/terraform-openstack-cluster/blob/main/CONVENTIONS.md). Contract:
 <https://captf.io/docs/module-author/contract/v1alpha1/cluster.html>.
+
+## Usage
+
+CAPTF runs this module from the module image `ghcr.io/captf-io/openstack-cluster`: set the image on
+a `TerraformCluster`'s `spec.source.image`, and the controller renders every
+input. The module is also published to the Terraform Registry as
+`captf-io/cluster/openstack` and can be called directly:
+
+```hcl
+module "cluster" {
+  source  = "captf-io/cluster/openstack"
+  version = "~> 0.1"
+
+  # The contract inputs the controller would render (captf_contract,
+  # captf_cluster, captf_object, captf_tags, ...; see Inputs), and any
+  # user variables.
+}
+```
+
+Called directly, the module is a CAPTF root module first:
+
+- it configures its own `provider "openstack"` block, so the calling
+  module cannot use `count`, `for_each` or `depends_on` on it, and the
+  provider takes its credentials from the environment (see Identity
+  Secret);
+- its providers are pinned to exact versions (`versions.tf`), which the
+  calling configuration has to accept;
+- you set the `captf_*` inputs yourself.
 
 ## What it creates
 
@@ -164,7 +192,7 @@ provider block sets nothing but the region. Recommended keys:
 
 Plain `OS_AUTH_URL`, `OS_APPLICATION_CREDENTIAL_ID`,
 `OS_APPLICATION_CREDENTIAL_SECRET`, `OS_REGION_NAME` and `OS_CACERT` keys
-work too. A full example is in [`examples/identity.yaml`](examples/identity.yaml).
+work too. A full example is in [`examples/identity.yaml`](https://github.com/captf-io/terraform-openstack-cluster/blob/main/examples/identity.yaml).
 
 ## Tags
 
@@ -234,7 +262,7 @@ observe.
   refresh. Pin the list for production clusters.
 - **No node identity.** The OpenStack cloud controller manager and Cinder
   CSI need a `cloud.conf` you supply (DESIGN.md decision 4;
-  [`examples/cloud-controller-manager.yaml`](examples/cloud-controller-manager.yaml)).
+  [`examples/cloud-controller-manager.yaml`](https://github.com/captf-io/terraform-openstack-cluster/blob/main/examples/cloud-controller-manager.yaml)).
   Leave the controller manager's `manage-security-groups` off: it would
   edit the node ports' groups behind the machine module.
 - **Rule changes replace rules.** Every security group rule attribute
@@ -258,7 +286,7 @@ observe.
 
 ## Examples
 
-[`examples/`](examples/) holds the identity, a kubeadm cluster with a
+[`examples/`](https://github.com/captf-io/terraform-openstack-cluster/blob/main/examples/) holds the identity, a kubeadm cluster with a
 MachineDeployment, and the cloud controller manager's `cloud.conf`. The
 smallest `TerraformCluster`:
 
