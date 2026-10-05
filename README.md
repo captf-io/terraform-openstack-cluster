@@ -1,25 +1,55 @@
-# terraform-openstack-cluster
+<h1 align="center">
+  <a href="https://captf.io/"><img
+    src="https://captf.io/assets/readme/mark.svg"
+    width="72" height="72" alt="CAPTF"></a>
+  <br>
+  terraform-openstack-cluster
+</h1>
 
-The CAPTF OpenStack `cluster` module: the Terraform/OpenTofu root module
-behind `TerraformCluster`. Module images are published from
-[openstack-modules](https://github.com/captf-io/openstack-modules) as `ghcr.io/captf-io/openstack-cluster`.
+<p align="center">The CAPTF cluster module for OpenStack</p>
 
-The `cluster` role for OpenStack: what a `TerraformCluster` runs. On a
-subnet you already have, it creates the security groups of the nodes, the
-Octavia load balancer behind the Kubernetes API, and a server group that
-spreads the control plane. Machines receive everything they need through
-the `exports` output.
+<p align="center">
+  <a href="https://github.com/captf-io/terraform-openstack-cluster/actions/workflows/ci.yml"><img
+    src="https://img.shields.io/github/actions/workflow/status/captf-io/terraform-openstack-cluster/ci.yml?branch=main&amp;label=build&amp;labelColor=161B3A&amp;style=flat-square"
+    alt="build"></a>
+  <a href="https://captf.io/docs/module-author/contract/index.html"><img
+    src="https://img.shields.io/static/v1?label=contract&amp;message=v1alpha1&amp;color=A974FF&amp;labelColor=161B3A&amp;style=flat-square"
+    alt="contract v1alpha1"></a>
+  <a href="https://captf.io/docs/"><img
+    src="https://img.shields.io/static/v1?label=docs&amp;message=captf.io&amp;color=5B8CFF&amp;labelColor=161B3A&amp;style=flat-square"
+    alt="docs captf.io"></a>
+  <a href="https://github.com/captf-io/terraform-openstack-cluster/blob/main/LICENSE.md"><img
+    src="https://img.shields.io/static/v1?label=license&amp;message=Apache-2.0&amp;color=FFD84D&amp;labelColor=161B3A&amp;style=flat-square"
+    alt="license Apache-2.0"></a>
+</p>
 
-Design and evidence: [DESIGN.md](https://github.com/captf-io/terraform-openstack-cluster/blob/main/DESIGN.md). Rules every file follows:
-[CONVENTIONS.md](https://github.com/captf-io/terraform-openstack-cluster/blob/main/CONVENTIONS.md). Contract:
+> [!NOTE]
+> **Pre-release.** CAPTF is `v1alpha1`: its API and its
+> [module contract](https://captf.io/docs/module-author/contract/index.html)
+> may still change between releases.
+
+The `cluster` role for OpenStack: the Terraform/OpenTofu root module behind
+`TerraformCluster`. On a subnet you already have, it creates the security
+groups of the nodes, the Octavia load balancer behind the Kubernetes API, and a
+server group that spreads the control plane. Machines receive everything they
+need through the `exports` output. The image
+`ghcr.io/captf-io/openstack-cluster` is published from
+[openstack-modules](https://github.com/captf-io/openstack-modules).
+
+Design and evidence:
+[DESIGN.md](https://github.com/captf-io/terraform-openstack-cluster/blob/main/DESIGN.md).
+Rules every file follows:
+[CONVENTIONS.md](https://github.com/captf-io/terraform-openstack-cluster/blob/main/CONVENTIONS.md).
+Contract:
 <https://captf.io/docs/module-author/contract/v1alpha1/cluster.html>.
 
-## Usage
+## Using it
 
-CAPTF runs this module from the module image `ghcr.io/captf-io/openstack-cluster`: set the image on
-a `TerraformCluster`'s `spec.source.image`, and the controller renders every
-input. The module is also published to the Terraform Registry as
-`captf-io/cluster/openstack` and can be called directly:
+CAPTF runs this module from the module image
+`ghcr.io/captf-io/openstack-cluster`: set the image on a `TerraformCluster`'s
+`spec.source.image`, and the controller renders every input. The module is also
+published to the Terraform Registry as `captf-io/cluster/openstack` and can be
+called directly:
 
 ```hcl
 module "cluster" {
@@ -304,7 +334,7 @@ spec:
     subnet_id: 5c1d7a0e-2b4f-4e83-9a61-0d8f3b2c4e71
 ```
 
-## Development
+## Developing
 
 The host needs `make`, `podman` (or `docker` with `ENGINE=docker`), `jq` and
 Go. Every other tool runs in a digest-pinned container. `make verify` is the
@@ -331,3 +361,29 @@ gate. Variables: `RUNTIMES` (default `terraform opentofu`), `ENGINE` and
 
 Module images are not built here; [openstack-modules](https://github.com/captf-io/openstack-modules) builds them from
 this code.
+
+<br>
+<p align="center">
+  <img
+    src="https://captf.io/assets/readme/divider.svg"
+    width="100%" height="4" alt="">
+</p>
+<p align="center">
+  <a href="https://captf.io/"><img
+    src="https://captf.io/assets/readme/mark.svg"
+    width="40" height="40" alt="CAPTF"></a>
+  <br>
+  <a href="https://captf.io/docs/"
+    ><b>Documentation</b></a> ·
+  <a href="https://captf.io/docs/getting-started/quick-start.html"
+    ><b>Quick start</b></a> ·
+  <a href="https://github.com/captf-io/.github/blob/main/CONTRIBUTING.md"
+    ><b>Contributing</b></a> ·
+  <a href="https://github.com/captf-io/.github/blob/main/SECURITY.md"
+    ><b>Security</b></a>
+  <br>
+  <sub>Built for
+    <a href="https://cluster-api.sigs.k8s.io/">Cluster API</a>.
+    <a href="https://github.com/captf-io/terraform-openstack-cluster/blob/main/LICENSE.md"
+    >Apache 2.0</a>.</sub>
+</p>
