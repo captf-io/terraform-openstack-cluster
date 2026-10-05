@@ -1,0 +1,85 @@
+# Copyright 2026 The CAPTF Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# The OpenStack cloud controller manager's cloud.conf for a workload cluster,
+# delivered by a ClusterResourceSet. The modules create no node identity
+# (DESIGN.md decision 4): this is the operator's credential.
+#
+# Use a dedicated application credential, not the identity the modules run
+# with, ideally restricted with access rules to what the controller manager
+# calls (Nova servers, Neutron ports and, for Service load balancers,
+# Octavia):
+#
+#   openstack application credential create captf-<cluster>-ccm
+#
+# The controller manager itself: put the v1.34.1 release manifests in a
+# ConfigMap the ClusterResourceSet below also applies. The release's
+# DaemonSet selects node-role.kubernetes.io/control-plane: "true", but
+# kubeadm sets that label to "", so change the selector to "" (the
+# openstack-cloud-controller-manager Helm chart's default):
+#
+#   base=https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/v1.34.1/manifests/controller-manager
+#   for f in cloud-controller-manager-roles.yaml cloud-controller-manager-role-bindings.yaml \
+#       openstack-cloud-controller-manager-ds.yaml; do curl -fsSL "$base/$f"; echo ---; done \
+#     | sed 's/node-role.kubernetes.io\/control-plane: "true"/node-role.kubernetes.io\/control-plane: ""/' \
+#     > openstack-ccm.yaml
+#   kubectl create configmap openstack-ccm -n "$NAMESPACE" --from-file=openstack-ccm.yaml
+#
+# Then: clusterctl generate yaml --from examples/cloud-controller-manager.yaml | kubectl apply -n "$NAMESPACE" -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "${CLUSTER_NAME}-cloud-config"
+# A ClusterResourceSet applies each data value to the workload cluster.
+type: addons.cluster.x-k8s.io/resource-set
+stringData:
+  cloud-config.yaml: |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: cloud-config
+      namespace: kube-system
+    type: Opaque
+    stringData:
+      cloud.conf: |
+        [Global]
+        auth-url = ${OPENSTACK_AUTH_URL}
+        application-credential-id = ${OPENSTACK_CCM_APPLICATION_CREDENTIAL_ID}
+        application-credential-secret = ${OPENSTACK_CCM_APPLICATION_CREDENTIAL_SECRET}
+        region = ${OPENSTACK_REGION:=RegionOne}
+        # ca-file = /etc/config/cacert.pem
+
+        [LoadBalancer]
+        # Service load balancers on the cluster subnet. The node security
+        # group admits NodePorts from it; keep manage-security-groups off,
+        # or the controller edits the node ports' groups behind the
+        # machine module.
+        subnet-id = ${OPENSTACK_SUBNET_ID}
+        manage-security-groups = false
+---
+apiVersion: addons.cluster.x-k8s.io/v1beta2
+kind: ClusterResourceSet
+metadata:
+  name: "${CLUSTER_NAME}-openstack-ccm"
+spec:
+  # examples/cluster-kubeadm.yaml labels its Cluster cloud-provider: openstack.
+  clusterSelector:
+    matchLabels:
+      cloud-provider: openstack
+  resources:
+  - kind: Secret
+    name: "${CLUSTER_NAME}-cloud-config"
+  - kind: ConfigMap
+    name: openstack-ccm
+  strategy: Reconcile

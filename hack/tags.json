@@ -1,0 +1,7 @@
+{
+  "attribute": "tags",
+  "expression": "local.tags",
+  "exempt": {
+    "openstack_compute_instance_v2": "The Nova instance carries the captf tags as `metadata` (key mapping in CONVENTIONS.md section 7); its `tags` set holds plain tags, not key/value pairs. The machine role README documents it."
+  }
+}

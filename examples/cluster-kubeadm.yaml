@@ -1,0 +1,231 @@
+# Copyright 2026 The CAPTF Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# A kubeadm cluster on OpenStack: a TerraformCluster with the openstack-cluster
+# image, a KubeadmControlPlane and a MachineDeployment on the openstack-machine
+# image. Apply examples/identity.yaml first, then:
+#
+#   export CLUSTER_NAME=demo NAMESPACE=team-a KUBERNETES_VERSION=v1.33.1 \
+#     OPENSTACK_SUBNET_ID=<subnet uuid> OPENSTACK_CONTROL_PLANE_FLAVOR=<flavor> \
+#     OPENSTACK_FLAVOR=<flavor> \
+#     OPENSTACK_IMAGE_NAME=<image with kubeadm v1.33.1>
+#   clusterctl generate yaml --from examples/cluster-kubeadm.yaml | kubectl apply -n "$NAMESPACE" -f -
+#
+# With the kubelet's cloud-provider: external, nodes carry the
+# node.cloudprovider.kubernetes.io/uninitialized taint until the OpenStack
+# cloud controller manager runs: install it with
+# examples/cloud-controller-manager.yaml (this Cluster carries the label it
+# selects), and a CNI (Calico's default pool is the pod CIDR below).
+#
+# The images are tagged <runtime> (newest release) here; pin vX.Y.Z-terraform
+# or a digest in anything you keep. Replace terraform with opentofu for the
+# OpenTofu builds.
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: "${CLUSTER_NAME}"
+  labels:
+    cloud-provider: openstack
+spec:
+  clusterNetwork:
+    # Kept equal to the KubeadmConfig bindPort below: kubeadm never reads
+    # apiServerPort, the module listens on it.
+    apiServerPort: 6443
+    pods:
+      cidrBlocks:
+      - "${POD_CIDR:=192.168.0.0/16}"
+    services:
+      cidrBlocks:
+      - "${SERVICE_CIDR:=10.96.0.0/12}"
+  controlPlaneRef:
+    apiGroup: controlplane.cluster.x-k8s.io
+    kind: KubeadmControlPlane
+    name: "${CLUSTER_NAME}-control-plane"
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: TerraformCluster
+    name: "${CLUSTER_NAME}"
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: TerraformCluster
+metadata:
+  name: "${CLUSTER_NAME}"
+spec:
+  source:
+    image: ghcr.io/captf-io/openstack-cluster:v0.1.0-opentofu
+  identityRef:
+    name: "${OPENSTACK_IDENTITY_NAME:=openstack}"
+  # Machines without their own identityRef use this one.
+  defaults:
+    identityRef:
+      name: "${OPENSTACK_IDENTITY_NAME:=openstack}"
+  # cluster/README.md lists every variable. The endpoint is the internal
+  # VIP: the management cluster must route to the subnet. For a public
+  # endpoint, set api_load_balancer_public: true, floating_ip_pool and
+  # api_allowed_cidrs (with
+  # the router's external address, cluster/README.md "Limitations").
+  variables:
+    subnet_id: "${OPENSTACK_SUBNET_ID}"
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+kind: KubeadmControlPlane
+metadata:
+  name: "${CLUSTER_NAME}-control-plane"
+spec:
+  replicas: ${CONTROL_PLANE_MACHINE_COUNT:=3}
+  version: "${KUBERNETES_VERSION}"
+  machineTemplate:
+    spec:
+      infrastructureRef:
+        apiGroup: infrastructure.cluster.x-k8s.io
+        kind: TerraformMachineTemplate
+        name: "${CLUSTER_NAME}-control-plane"
+  # A machine whose apply always fails must not be replaced forever.
+  remediation:
+    maxRetry: 3
+    retryPeriodSeconds: 300
+  kubeadmConfigSpec:
+    # The Node is named after the server (the cloud controller manager
+    # finds servers by Node name), and the kubelet registers the provider
+    # ID the machine module reports, before the controller manager runs.
+    # With provider_id_format: regional, use
+    # openstack://<region>/{{ v1.instance_id }} instead. CABPK renders
+    # user data as a cloud-init Jinja template.
+    initConfiguration:
+      localAPIEndpoint:
+        bindPort: 6443
+      nodeRegistration:
+        name: "{{ v1.local_hostname }}"
+        kubeletExtraArgs:
+        - name: cloud-provider
+          value: external
+        - name: provider-id
+          value: "openstack:///{{ v1.instance_id }}"
+    joinConfiguration:
+      controlPlane:
+        localAPIEndpoint:
+          bindPort: 6443
+      nodeRegistration:
+        name: "{{ v1.local_hostname }}"
+        kubeletExtraArgs:
+        - name: cloud-provider
+          value: external
+        - name: provider-id
+          value: "openstack:///{{ v1.instance_id }}"
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: TerraformMachineTemplate
+metadata:
+  name: "${CLUSTER_NAME}-control-plane"
+spec:
+  template:
+    spec:
+      source:
+        image: ghcr.io/captf-io/openstack-machine:v0.1.0-opentofu
+      # machine/README.md lists every variable.
+      variables:
+        flavor_name: "${OPENSTACK_CONTROL_PLANE_FLAVOR}"
+        image_name: "${OPENSTACK_IMAGE_NAME}"
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: MachineDeployment
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  clusterName: "${CLUSTER_NAME}"
+  replicas: ${WORKER_MACHINE_COUNT:=2}
+  # CAPI's webhook fills in the selector and the template labels.
+  selector:
+    matchLabels:
+  template:
+    spec:
+      clusterName: "${CLUSTER_NAME}"
+      version: "${KUBERNETES_VERSION}"
+      bootstrap:
+        configRef:
+          apiGroup: bootstrap.cluster.x-k8s.io
+          kind: KubeadmConfigTemplate
+          name: "${CLUSTER_NAME}-md-0"
+      infrastructureRef:
+        apiGroup: infrastructure.cluster.x-k8s.io
+        kind: TerraformMachineTemplate
+        name: "${CLUSTER_NAME}-md-0"
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: TerraformMachineTemplate
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  template:
+    spec:
+      source:
+        image: ghcr.io/captf-io/openstack-machine:v0.1.0-opentofu
+      variables:
+        flavor_name: "${OPENSTACK_FLAVOR}"
+        image_name: "${OPENSTACK_IMAGE_NAME}"
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+kind: KubeadmConfigTemplate
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  template:
+    spec:
+      joinConfiguration:
+        nodeRegistration:
+          name: "{{ v1.local_hostname }}"
+          kubeletExtraArgs:
+          - name: cloud-provider
+            value: external
+          - name: provider-id
+            value: "openstack:///{{ v1.instance_id }}"
+---
+# Workers: InfrastructureReady=False (the module's health output) is
+# unhealthy after the timeout. It starts at apply start, so the timeout must
+# exceed apply time plus one drift interval: 2700 s with the default 30m
+# (CONVENTIONS.md section 17).
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: MachineHealthCheck
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  clusterName: "${CLUSTER_NAME}"
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/deployment-name: "${CLUSTER_NAME}-md-0"
+  checks:
+    nodeStartupTimeoutSeconds: 1200
+    unhealthyMachineConditions:
+    - type: InfrastructureReady
+      status: "False"
+      timeoutSeconds: 2700
+---
+# The control plane: a control-plane apply also waits for the load balancer
+# members and a serialized join, so its timeout is longer. KCP remediates
+# what this marks, within remediation.maxRetry above.
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: MachineHealthCheck
+metadata:
+  name: "${CLUSTER_NAME}-control-plane"
+spec:
+  clusterName: "${CLUSTER_NAME}"
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/control-plane: ""
+  checks:
+    nodeStartupTimeoutSeconds: 1800
+    unhealthyMachineConditions:
+    - type: InfrastructureReady
+      status: "False"
+      timeoutSeconds: 3600
