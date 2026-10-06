@@ -33,8 +33,8 @@ The `cluster` role for OpenStack: the Terraform/OpenTofu root module behind
 groups of the nodes, the Octavia load balancer behind the Kubernetes API, and a
 server group that spreads the control plane. Machines receive everything they
 need through the `exports` output. The image
-`ghcr.io/captf-io/openstack-cluster` is published from
-[openstack-modules](https://github.com/captf-io/openstack-modules).
+`ghcr.io/captf-io/module-images/openstack-cluster` is built and published by
+[module-images](https://github.com/captf-io/module-images) from this repository's releases.
 
 Design and evidence:
 [DESIGN.md](https://github.com/captf-io/terraform-openstack-cluster/blob/main/DESIGN.md).
@@ -46,7 +46,7 @@ Contract:
 ## Using it
 
 CAPTF runs this module from the module image
-`ghcr.io/captf-io/openstack-cluster`: set the image on a `TerraformCluster`'s
+`ghcr.io/captf-io/module-images/openstack-cluster`: set the image on a `TerraformCluster`'s
 `spec.source.image`, and the controller renders every input. The module is also
 published to the Terraform Registry as `captf-io/cluster/openstack` and can be
 called directly:
@@ -327,7 +327,7 @@ metadata:
   name: demo
 spec:
   source:
-    image: ghcr.io/captf-io/openstack-cluster:v0.1.0-opentofu
+    image: ghcr.io/captf-io/module-images/openstack-cluster:v0.1.0-opentofu
   identityRef:
     name: openstack
   variables:
@@ -359,8 +359,8 @@ gate. Variables: `RUNTIMES` (default `terraform opentofu`), `ENGINE` and
 | `make verify` | All of the above, in parallel groups |
 | `make clean` | Removes `build/`; keeps `.cache/` and `.tools/` |
 
-Module images are not built here; [openstack-modules](https://github.com/captf-io/openstack-modules) builds them from
-this code.
+Module images are not built here; [module-images](https://github.com/captf-io/module-images) builds them from
+this repository's releases.
 
 <br>
 <p align="center">

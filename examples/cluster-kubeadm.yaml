@@ -63,7 +63,7 @@ metadata:
   name: "${CLUSTER_NAME}"
 spec:
   source:
-    image: ghcr.io/captf-io/openstack-cluster:v0.1.0-opentofu
+    image: ghcr.io/captf-io/module-images/openstack-cluster:v0.1.0-opentofu
   identityRef:
     name: "${OPENSTACK_IDENTITY_NAME:=openstack}"
   # Machines without their own identityRef use this one.
@@ -132,7 +132,7 @@ spec:
   template:
     spec:
       source:
-        image: ghcr.io/captf-io/openstack-machine:v0.1.0-opentofu
+        image: ghcr.io/captf-io/module-images/openstack-machine:v0.1.0-opentofu
       # machine/README.md lists every variable.
       variables:
         flavor_name: "${OPENSTACK_CONTROL_PLANE_FLAVOR}"
@@ -170,7 +170,7 @@ spec:
   template:
     spec:
       source:
-        image: ghcr.io/captf-io/openstack-machine:v0.1.0-opentofu
+        image: ghcr.io/captf-io/module-images/openstack-machine:v0.1.0-opentofu
       variables:
         flavor_name: "${OPENSTACK_FLAVOR}"
         image_name: "${OPENSTACK_IMAGE_NAME}"
